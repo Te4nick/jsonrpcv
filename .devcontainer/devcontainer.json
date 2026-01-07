@@ -1,0 +1,28 @@
+{
+  "name": "V Dev",  
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "CONTAINER_TAG": "3.23.2",
+      "V_RELEASE_TAG": "0.5"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vosca.vscode-v-analyzer",
+        "ms-vscode.cpptools"
+      ]
+    }
+    },
+    "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+        "installZsh": "true",
+        "username": "vscode",
+        "userUid": "1000",
+        "userGid": "1000",
+        "upgradePackages": "false"
+    }
+  },
+  "remoteUser": "vscode"
+}
