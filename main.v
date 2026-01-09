@@ -31,71 +31,80 @@ mut:
 	store map[string]string
 }
 
-fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) ! {
+fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
 	match req.method {
 		'kv.create' {
 			p := req.decode_params[KvCreateParams]() or {
-				return jsonrpc.invalid_params
+				wr.write_error(jsonrpc.invalid_params)
+				return
 			}
 			if p.key.len == 0 {
-				return jsonrpc.invalid_params
+				wr.write_error(jsonrpc.invalid_params)
+				return
 			}
 			h.mu.@lock()
 			defer { h.mu.unlock() }
 			if p.key in h.store {
 				// custom app-level error code
-				return jsonrpc.ResponseError{
+				wr.write_error(jsonrpc.ResponseError{
 					code: -32010
 					message: 'Key already exists'
 					data: p.key
-				}
+				})
+				return
 			}
 			h.store[p.key] = p.value
 			wr.write({ 'ok': true })
 		}
 		'kv.get' {
 			p := req.decode_params[KvKeyParams]() or {
-				return jsonrpc.invalid_params
+				wr.write_error(jsonrpc.invalid_params)
+				return
 			}
 			h.mu.@lock()
 			defer { h.mu.unlock() }
 			if p.key !in h.store {
-				return jsonrpc.ResponseError{
+				wr.write_error(jsonrpc.ResponseError{
 					code: -32004
 					message: 'Not found'
 					data: p.key
-				}
+				})
+				return
 			}
 			wr.write(KvItem{ key: p.key, value: h.store[p.key] })
 		}
 		'kv.update' {
 			p := req.decode_params[KvUpdateParams]() or {
-				return jsonrpc.invalid_params
+				wr.write_error(jsonrpc.invalid_params)
+				return
 			}
 			h.mu.@lock()
 			defer { h.mu.unlock() }
 			if p.key !in h.store {
-				return jsonrpc.ResponseError{
+				wr.write_error(jsonrpc.ResponseError{
 					code: -32004
 					message: 'Not found'
 					data: p.key
-				}
+				})
+				return
 			}
 			h.store[p.key] = p.value
 			wr.write({ 'ok': true })
 		}
 		'kv.delete' {
 			p := req.decode_params[KvKeyParams]() or {
-				return jsonrpc.invalid_params
+				wr.write_error(jsonrpc.invalid_params)
+				return
 			}
 			h.mu.@lock()
 			defer { h.mu.unlock() }
 			if p.key !in h.store {
-				return jsonrpc.ResponseError{
+				wr.write_error(jsonrpc.ResponseError{
 					code: -32004
 					message: 'Not found'
 					data: p.key
-				}
+				})
+				return
 			}
 			h.store.delete(p.key)
 			wr.write({ 'ok': true })
@@ -111,7 +120,7 @@ fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.Respons
 			wr.write(items)
 		}
 		else {
-			return jsonrpc.method_not_found
+			wr.write_error(jsonrpc.method_not_found)
 		}
 	}
 }
@@ -122,7 +131,8 @@ fn handle_conn(mut conn net.TcpConn) {
 	defer { conn.close() or {} }
 
 	mut srv := jsonrpc.Server{
-		stream: conn
+		write_to: conn
+		read_from: conn
 		handler: KvHandler{
 			store: map[string]string{}
 		}
