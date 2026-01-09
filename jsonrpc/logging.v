@@ -4,8 +4,6 @@ import time
 
 pub struct LoggingInterceptor {}
 
-pub fn (mut l LoggingInterceptor) on_event(name string, data InterceptorData) ! {}
-
 pub fn (mut l LoggingInterceptor) on_raw_request(req []u8) ! {
 	// NOTE: server.v doesn't call intercept_raw_request() by default
 	println('[RAW] ${time.now()}')

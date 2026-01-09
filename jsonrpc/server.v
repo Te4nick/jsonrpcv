@@ -4,15 +4,42 @@ import json
 import strings
 import io
 
+pub struct ServerConfig {
+pub mut:
+	write_to     io.Writer
+	read_from    io.Reader
+	handler      Handler
+	e_inters []EventInterceptor
+	raw_req_inters []RawRequestInterceptor
+	req_inters []RequestInterceptor
+	enc_resp_inters []EncodedResponseInterceptor
+}
+
 // Server represents a JSONRPC server that sends/receives data
 // from a stream (an io.ReaderWriter) and uses Content-Length framing. :contentReference[oaicite:6]{index=6}
 @[heap]
 pub struct Server {
-pub mut:
-	interceptors []Interceptor
+mut:
 	write_to     io.Writer
 	read_from    io.Reader
 	handler      Handler
+	e_inters []EventInterceptor
+	raw_req_inters []RawRequestInterceptor
+	req_inters []RequestInterceptor
+	enc_resp_inters []EncodedResponseInterceptor
+}
+
+pub fn new_server(cfg ServerConfig) Server {
+	return Server{
+		write_to: cfg.write_to
+		read_from: cfg.read_from
+		handler: cfg.handler
+		e_inters: cfg.e_inters
+		raw_req_inters: cfg.raw_req_inters
+		req_inters: cfg.req_inters
+		enc_resp_inters: cfg.enc_resp_inters
+	}
+
 }
 
 // process_raw_request decodes raw request into JSONRPC Request by reading after \r\n\r\n. :contentReference[oaicite:7]{index=7}
@@ -40,7 +67,10 @@ pub fn (mut s Server) respond() ! {
 		return
 	}
 
-	s.intercept_raw_request(rx)!
+	s.intercept_raw_request(rx) or {
+		rw.write_error(response_error(error: err))
+		return err
+	}
 
 	req_str := rx.bytestr()
 
@@ -91,9 +121,9 @@ pub fn (s &Server) writer(cfg NewWriterConfig) &ResponseWriter {
 	return &ResponseWriter{
 		writer: io.MultiWriter{
 			writers: [
-				// InterceptorWriter{
-				// 	interceptors: s.interceptors
-				// },
+				InterceptorWriter{
+					interceptors: s.enc_resp_inters
+				},
 				s.write_to
 			]
 		}

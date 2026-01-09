@@ -130,16 +130,16 @@ fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.Respons
 fn handle_conn(mut conn net.TcpConn) {
 	defer { conn.close() or {} }
 
-	mut srv := jsonrpc.Server{
+	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
 		write_to: conn
 		read_from: conn
 		handler: KvHandler{
 			store: map[string]string{}
 		}
-		interceptors: [
-			jsonrpc.LoggingInterceptor{},
-		]
-	}
+		raw_req_inters: [jsonrpc.LoggingInterceptor{}]
+		req_inters: [jsonrpc.LoggingInterceptor{}]
+		enc_resp_inters: [jsonrpc.LoggingInterceptor{}]
+	})
 
 	srv.start()
 }
