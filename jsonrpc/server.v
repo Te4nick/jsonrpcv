@@ -6,13 +6,12 @@ import io
 
 pub struct ServerConfig {
 pub mut:
-	write_to     io.Writer
-	read_from    io.Reader
+	stream    io.ReaderWriter
 	handler      Handler
-	e_inters []EventInterceptor
-	raw_req_inters []RawRequestInterceptor
-	req_inters []RequestInterceptor
-	enc_resp_inters []EncodedResponseInterceptor
+	encreqint []EncodedRequestInterceptor
+	reqint []RequestInterceptor
+	respint []ResponseInterceptor
+	encrespint []EncodedResponseInterceptor
 }
 
 // Server represents a JSONRPC server that sends/receives data
@@ -20,43 +19,30 @@ pub mut:
 @[heap]
 pub struct Server {
 mut:
-	write_to     io.Writer
-	read_from    io.Reader
+	stream    io.ReaderWriter
 	handler      Handler
-	e_inters []EventInterceptor
-	raw_req_inters []RawRequestInterceptor
-	req_inters []RequestInterceptor
-	enc_resp_inters []EncodedResponseInterceptor
+	encreqint []EncodedRequestInterceptor
+	reqint []RequestInterceptor
+	respint []ResponseInterceptor
+	encrespint []EncodedResponseInterceptor
 }
 
 pub fn new_server(cfg ServerConfig) Server {
 	return Server{
-		write_to: cfg.write_to
-		read_from: cfg.read_from
+		stream: cfg.stream
 		handler: cfg.handler
-		e_inters: cfg.e_inters
-		raw_req_inters: cfg.raw_req_inters
-		req_inters: cfg.req_inters
-		enc_resp_inters: cfg.enc_resp_inters
+		encreqint: cfg.encreqint
+		reqint: cfg.reqint
+		respint: cfg.respint
+		encrespint: cfg.encrespint
 	}
 
-}
-
-// process_raw_request decodes raw request into JSONRPC Request by reading after \r\n\r\n. :contentReference[oaicite:7]{index=7}
-fn (s Server) process_raw_request(raw_request string) !Request {
-	json_payload := raw_request.all_after('\r\n\r\n')
-	return json.decode(Request, json_payload) or { return err }
-}
-
-fn (s Server) process_raw_batch_request(raw_request string) ![]Request {
-	json_payload := raw_request.all_after('\r\n\r\n')
-	return json.decode([]Request, json_payload) or { return err }
 }
 
 pub fn (mut s Server) respond() ! {
 	mut rw := s.writer()
 	mut rx := []u8{len: 4096}
-	bytes_read := s.read_from.read(mut rx) or {
+	bytes_read := s.stream.read(mut rx) or {
 		if err is io.Eof {
 			return
 		}
@@ -67,7 +53,7 @@ pub fn (mut s Server) respond() ! {
 		return
 	}
 
-	s.intercept_raw_request(rx) or {
+	s.intercept_encoded_request(rx) or {
 		rw.write_error(response_error(error: err))
 		return err
 	}
@@ -77,14 +63,14 @@ pub fn (mut s Server) respond() ! {
 	mut req_batch := []Request{}
 	match req_str[0].ascii_str() {
 		'[' {
-			req_batch = s.process_raw_batch_request(req_str) or {
+			req_batch = decode_batch_request(req_str) or {
 				rw.write_error(response_error(error: parse_error))
 				return err
 			}
 			rw.start_batch()
 		}
 		'{' {
-			req := s.process_raw_request(req_str) or {
+			req := decode_request(req_str) or {
 				rw.write_error(response_error(error: parse_error))
 				return err
 			}
@@ -112,22 +98,11 @@ pub fn (mut s Server) respond() ! {
 	}
 }
 
-@[params]
-pub struct NewWriterConfig {
-	own_buffer bool
-}
-
-pub fn (s &Server) writer(cfg NewWriterConfig) &ResponseWriter {
+fn (s &Server) writer() &ResponseWriter {
 	return &ResponseWriter{
-		writer: io.MultiWriter{
-			writers: [
-				InterceptorWriter{
-					interceptors: s.enc_resp_inters
-				},
-				s.write_to
-			]
-		}
+		writer: s.stream
 		sb:     strings.new_builder(4096)
+		server: s
 	}
 }
 
@@ -150,9 +125,10 @@ pub struct ResponseWriter {
 mut:
 	sb       strings.Builder
 	is_batch bool
+	server &Server
 pub mut:
-	req_id string = 'null'
-	writer io.Writer
+	req_id string
+	writer io.ReaderWriter
 }
 
 fn (mut rw ResponseWriter) start_batch() {
@@ -161,26 +137,31 @@ fn (mut rw ResponseWriter) start_batch() {
 }
 
 fn (mut rw ResponseWriter) close_batch() {
+	rw.is_batch = false
 	rw.sb.go_back(2)
 	rw.sb.write_string(']')
 	rw.close()
 }
 
 fn (mut rw ResponseWriter) close() {
+	rw.server.intercept_encoded_response(rw.sb)
 	rw.writer.write(rw.sb) or {}
 	rw.sb.go_back_to(0)
 }
 
 pub fn (mut rw ResponseWriter) write[T](payload T) {
-	final_resp := Response[T]{
+	final_resp := Response{
 		id:     rw.req_id
-		result: payload
+		result: json.encode(payload)
 	}
-	encode_response[T](final_resp, mut rw.sb)
+	
+	rw.server.intercept_response(final_resp)
 
-	accumulated := rw.sb.str()
-	rw.sb = strings.new_builder(4096)
-	rw.sb.write_string(accumulated)
+	if rw.req_id.len == 0 {
+		return
+	}
+
+	rw.sb.write_string(final_resp.encode())
 
 	if rw.is_batch == true {
 		rw.sb.write_string(', ')
@@ -194,11 +175,8 @@ pub fn (mut rw ResponseWriter) write_empty() {
 }
 
 pub fn (mut rw ResponseWriter) write_notify[T](method string, params T) {
-	notif := NotificationMessage[T]{
-		method: method
-		params: params
-	}
-	encode_notification[T](notif, mut rw.sb)
+	notif := new_notification(method, params)
+	rw.sb.write_string(notif.encode())
 	if rw.is_batch {
 		rw.sb.write_string(', ')
 		return
@@ -216,11 +194,14 @@ pub fn (mut rw ResponseWriter) write_error(err IError) {
 		}
 	}
 
-	final_resp := Response[string]{
+	final_resp := Response{
 		id:    rw.req_id
 		error: res_err as ResponseError
 	}
-	encode_response[string](final_resp, mut rw.sb)
+
+	rw.server.intercept_response(final_resp)
+
+	rw.sb.write_string(final_resp.encode())
 	if rw.is_batch {
 		rw.sb.write_string(', ')
 		return

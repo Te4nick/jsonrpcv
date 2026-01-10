@@ -1,8 +1,6 @@
 module jsonrpc
 
 import json
-import strings
-import io
 
 pub const version = '2.0'
 
@@ -65,87 +63,117 @@ pub const null = Null{}
 
 // Request uses raw JSON strings for id and params in the old VLS code. :contentReference[oaicite:4]{index=4}
 pub struct Request {
-pub mut:
+pub:
 	jsonrpc string = jsonrpc.version
-	id      string @[raw] // raw JSON (e.g. 1 or "abc")
 	method  string
 	params  string @[raw] // raw JSON object/array/null
+	id      string @[omitempty; raw] // raw JSON (e.g. 1 or "abc") if empty => notification (no id field)
 }
 
-pub fn (req Request) json() string {
+pub fn new_request[T] (method string, params T, id string) Request {
+	return Request{
+		method: method
+		params: $if params is string { params } $else { json.encode(params) }
+		id: id
+	}
+}
+
+pub fn (req Request) encode() string {
 	// If id is empty => notification (no id field)
-	id_payload := if req.id.len != 0 { ',"id":$req.id,' } else { ',' }
-	return '{"jsonrpc":"$jsonrpc.version"$id_payload"method":"$req.method","params":$req.params}'
+	id_payload := if req.id.len != 0 { ',"id":"${req.id}",' } else { ',' }
+	return '{"jsonrpc":"${jsonrpc.version}"${id_payload}"method":"${req.method}","params":${req.params}}'
 }
 
 pub fn (req Request) decode_params[T]() !T {
 	return json.decode(T, req.params) or { return err }
 }
 
-pub struct Response[T] {
+// decode_request decodes raw request into JSONRPC Request by reading after \r\n\r\n. :contentReference[oaicite:7]{index=7}
+pub fn decode_request(raw string) !Request {
+	json_payload := raw.all_after('\r\n\r\n')
+	return json.decode(Request, json_payload) or { return err }
+}
+
+pub fn decode_batch_request(raw string) ![]Request {
+	json_payload := raw.all_after('\r\n\r\n')
+	return json.decode([]Request, json_payload) or { return err }
+}
+
+pub struct Response {
 pub:
 	jsonrpc string = jsonrpc.version
-	id      string
-	result  T
+	result  string @[raw]
 	error   ResponseError
+	id      string
 }
 
-pub fn (resp Response[T]) json() string {
-	mut resp_wr := strings.new_builder(100)
-	defer { unsafe { resp_wr.free() } }
-	encode_response[T](resp, mut resp_wr)
-	return resp_wr.str()
+pub fn new_response[T] (result T, error ResponseError, id string) Request {
+	res := if error.code != 0 { 
+		"" 
+	} else {$if result is string { 
+		result 
+	} $else { 
+		json.encode(result) 
+	}}
+	
+	return Request{
+		result: res
+		error: error
+		id: id
+	}
 }
 
-const null_in_u8 = 'null'.bytes()
-const error_field_in_u8 = ',"error":'.bytes()
-const result_field_in_u8 = ',"result":'.bytes()
-
-fn encode_response[T](resp Response[T], mut writer io.Writer) {
-	writer.write('{"jsonrpc":"$jsonrpc.version","id":'.bytes()) or {}
+pub fn (resp Response) encode() string {
+	mut s := '{"jsonrpc":"${jsonrpc.version}","id":'
 	if resp.id.len == 0 {
-		writer.write(jsonrpc.null_in_u8) or {}
+		s = s + 'null'
 	} else {
-		writer.write(resp.id.bytes()) or {}
+		s = s + resp.id
 	}
 	if resp.error.code != 0 {
-		err_json := json.encode(resp.error)
-		writer.write(jsonrpc.error_field_in_u8) or {}
-		writer.write(err_json.bytes()) or {}
+		s = s + ',"error":' + json.encode(resp.error)
 	} else {
-		writer.write(jsonrpc.result_field_in_u8) or {}
-		$if T is Null {
-			writer.write(jsonrpc.null_in_u8) or {}
-		} $else {
-			res_json := json.encode(resp.result)
-			writer.write(res_json.bytes()) or {}
-		}
+		s = s + ',"result":' + resp.result
 	}
-	writer.write([u8(`}`)]) or {}
+	return s + '}'
 }
 
-// NotificationMessage is Request without id. :contentReference[oaicite:5]{index=5}
-pub struct NotificationMessage[T] {
+pub fn (resp Response) decode_result[T]() !T {
+	return json.decode(T, resp.result) or { return err }
+}
+
+pub fn decode_response(raw string) !Response {
+	json_payload := raw.all_after('\r\n\r\n')
+	return json.decode(Response, json_payload) or { return err }
+}
+
+pub fn decode_batch_response(raw string) ![]Response {
+	json_payload := raw.all_after('\r\n\r\n')
+	return json.decode([]Response, json_payload) or { return err }
+}
+
+// Notification is Request without id. :contentReference[oaicite:5]{index=5}
+pub struct Notification {
 pub:
 	jsonrpc string = jsonrpc.version
 	method  string
-	params  T
+	params  string @[raw]
 }
 
-pub fn (notif NotificationMessage[T]) json() string {
-	mut notif_wr := strings.new_builder(100)
-	defer { unsafe { notif_wr.free() } }
-	encode_notification[T](notif, mut notif_wr)
-	return notif_wr.str()
-}
-
-fn encode_notification[T](notif NotificationMessage[T], mut writer io.Writer) {
-	writer.write('{"jsonrpc":"$jsonrpc.version","method":"$notif.method","params":'.bytes()) or {}
-	$if T is Null {
-		writer.write(jsonrpc.null_in_u8) or {}
-	} $else {
-		res := json.encode(notif.params)
-		writer.write(res.bytes()) or {}
+pub fn new_notification[T] (method string, params T) Notification {
+	return Notification{
+		method: method
+		params: $if params is string { params } $else { json.encode(params) }
 	}
-	writer.write([u8(`}`)]) or {}
+}
+
+fn (notif Notification) encode() string {
+	mut s := '{"jsonrpc":"${jsonrpc.version}","method":"${notif.method}","params":'
+	if notif.params.len == 0 {
+		s = s + 'null'
+	} else {
+		s = s + notif.params
+	}
+	
+	return s + '}'
 }

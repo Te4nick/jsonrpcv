@@ -3,6 +3,7 @@ module main
 import net
 import sync
 import jsonrpc
+import log
 
 // ---- CRUD domain ----
 struct KvCreateParams {
@@ -125,20 +126,36 @@ fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.Respons
 	}
 }
 
+pub fn on_event_logger(name string, data string) ! {
+	msg := '[EVENT] name=${name} data=${data}'
+	mut l := log.new_thread_safe_log()
+	l.debug(msg)
+}
+
 // ---- Per-connection server loop ----
 // The jsonrpc.Server.start() reads from stream and writes to same stream. :contentReference[oaicite:9]{index=9}
 fn handle_conn(mut conn net.TcpConn) {
 	defer { conn.close() or {} }
 
+	mut log_inter := jsonrpc.LoggingInterceptor{}
+	// inters := jsonrpc.Interceptors{
+	// 	event: [on_event_logger]
+	// 	// encoded_request: [log_inter.on_encoded_request]
+	// 	// request: [log_inter.on_request]
+	// 	// response: [log_inter.on_response]
+	// 	// encoded_response: [log_inter.on_encoded_response]
+	// }
+
 	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
-		write_to: conn
-		read_from: conn
+		stream: conn
 		handler: KvHandler{
 			store: map[string]string{}
 		}
-		raw_req_inters: [jsonrpc.LoggingInterceptor{}]
-		req_inters: [jsonrpc.LoggingInterceptor{}]
-		enc_resp_inters: [jsonrpc.LoggingInterceptor{}]
+		//interceptors: [log_inter]
+		encreqint: [log_inter]
+		reqint: [log_inter]
+		respint: [log_inter]
+		encrespint: [log_inter]
 	})
 
 	srv.start()
