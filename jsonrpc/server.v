@@ -7,7 +7,7 @@ import io
 pub struct ServerConfig {
 pub mut:
 	stream    io.ReaderWriter
-	handler      Handler
+	handler      Handler @[required]
 	interceptors Interceptors
 }
 
@@ -17,7 +17,7 @@ pub mut:
 pub struct Server {
 mut:
 	stream    io.ReaderWriter
-	handler      Handler
+	handler      Handler @[required]
 	interceptors Interceptors
 }
 
@@ -81,7 +81,7 @@ pub fn (mut s Server) respond() ! {
 			return err
 		}
 
-		s.handler.handle_jsonrpc(&rq, mut rw)
+		s.handler(&rq, mut rw)
 	}
 
 	if req_batch.len > 1 {
@@ -107,9 +107,29 @@ pub fn (mut s Server) start() {
 	}
 }
 
-pub interface Handler {
+pub type Handler = fn(req &Request, mut wr ResponseWriter)
+
+pub struct Router {
 mut:
-	handle_jsonrpc(req &Request, mut wr ResponseWriter)
+	methods map[string]Handler
+}
+
+pub fn (r Router) handle_jsonrpc(req &Request, mut wr ResponseWriter) {
+	if h := r.methods[req.method] {
+		h(req, mut wr)
+		return
+	}
+
+	wr.write_error(jsonrpc.method_not_found)
+}
+
+pub fn (mut r Router) register(method string, handler Handler) bool {
+	if method in r.methods {
+		return false
+	}
+
+	r.methods[method] = handler
+	return true
 }
 
 pub struct ResponseWriter {

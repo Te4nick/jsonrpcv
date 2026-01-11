@@ -6,130 +6,159 @@ import jsonrpc
 import log
 
 // ---- CRUD domain ----
-struct KvCreateParams {
-	key   string
-	value string
-}
-
-struct KvKeyParams {
-	key string
-}
-
-struct KvUpdateParams {
-	key   string
-	value string
-}
-
 struct KvItem {
 	key   string
 	value string
 }
 
+struct KvKey {
+	key string
+}
+
 // ---- Handler ----
-struct KvHandler {
+struct KvStore {
 mut:
-	mu    sync.Mutex
+	mu    &sync.RwMutex = sync.new_rwmutex()
 	store map[string]string
 }
 
-fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
-	match req.method {
-		'kv.create' {
-			p := req.decode_params[KvCreateParams]() or {
-				wr.write_error(jsonrpc.invalid_params)
-				return
-			}
-			if p.key.len == 0 {
-				wr.write_error(jsonrpc.invalid_params)
-				return
-			}
-			log.warn("params=${p}")
-			h.mu.@lock()
-			defer { h.mu.unlock() }
-			if p.key in h.store {
-				// custom app-level error code
-				wr.write_error(jsonrpc.ResponseError{
-					code: -32010
-					message: 'Key already exists'
-					data: p.key
-				})
-				return
-			}
-			h.store[p.key] = p.value
-			wr.write({ 'ok': true })
-		}
-		'kv.get' {
-			p := req.decode_params[KvKeyParams]() or {
-				wr.write_error(jsonrpc.invalid_params)
-				return
-			}
-			h.mu.@lock()
-			defer { h.mu.unlock() }
-			if p.key !in h.store {
-				wr.write_error(jsonrpc.ResponseError{
-					code: -32004
-					message: 'Not found'
-					data: p.key
-				})
-				return
-			}
-			wr.write(KvItem{ key: p.key, value: h.store[p.key] })
-		}
-		'kv.update' {
-			p := req.decode_params[KvUpdateParams]() or {
-				wr.write_error(jsonrpc.invalid_params)
-				return
-			}
-			h.mu.@lock()
-			defer { h.mu.unlock() }
-			if p.key !in h.store {
-				wr.write_error(jsonrpc.ResponseError{
-					code: -32004
-					message: 'Not found'
-					data: p.key
-				})
-				return
-			}
-			h.store[p.key] = p.value
-			wr.write({ 'ok': true })
-		}
-		'kv.delete' {
-			p := req.decode_params[KvKeyParams]() or {
-				wr.write_error(jsonrpc.invalid_params)
-				return
-			}
-			h.mu.@lock()
-			defer { h.mu.unlock() }
-			if p.key !in h.store {
-				wr.write_error(jsonrpc.ResponseError{
-					code: -32004
-					message: 'Not found'
-					data: p.key
-				})
-				return
-			}
-			h.store.delete(p.key)
-			wr.write({ 'ok': true })
-		}
-		'kv.list' {
-			h.mu.@lock()
-			defer { h.mu.unlock() }
-			mut items := []KvItem{}
-			for k, v in h.store {
-				items << KvItem{ key: k, value: v }
-			}
-			items.sort(a.key < b.key)
-			wr.write(items)
-		}
-		else {
-			wr.write_error(jsonrpc.method_not_found)
-		}
+fn (mut s KvStore) create(key string, value string) bool {
+	s.mu.@lock()
+	defer { s.mu.unlock() }
+	if key in s.store {
+		return false
 	}
+	s.store[key] = value
+	return true
+}
+
+fn (mut s KvStore) get(key string) ?string {
+	s.mu.@rlock()
+	defer { s.mu.runlock() }
+	if value := s.store[key] {
+		return value
+	}
+	return none
+}
+
+fn (mut s KvStore) update(key string, value string) bool {
+	s.mu.@lock()
+	defer { s.mu.unlock() }
+	if key in s.store {
+		s.store[key] = value
+		return true
+	}
+	return false
+}
+
+fn (mut s KvStore) delete(key string) bool {
+	s.mu.@lock()
+	defer { s.mu.unlock() }
+	if key in s.store {
+		s.store.delete(key)
+		return true
+	}
+	return false
+}
+
+fn (s KvStore) dump() map[string]string {
+	return s.store
+}
+
+@[heap]
+struct KvHandler {
+mut:
+	store KvStore
+}
+
+fn (mut h KvHandler) handle_create(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+	p := req.decode_params[KvItem]() or {
+		wr.write_error(jsonrpc.invalid_params)
+		return
+	}
+	if p.key.len == 0 {
+		wr.write_error(jsonrpc.invalid_params)
+		return
+	}
+	log.warn("params=${p}")
+	if !h.store.create(p.key, p.value) {
+		wr.write_error(jsonrpc.ResponseError{ // custom app-level error code
+			code: -32010
+			message: 'Key already exists'
+			data: p.key
+		})
+		return
+	}
+
+	wr.write({ 'ok': true })
+}
+
+fn (mut h KvHandler) handle_get(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+	p := req.decode_params[KvKey]() or {
+		wr.write_error(jsonrpc.invalid_params)
+		return
+	}
+
+	value := h.store.get(p.key) or {
+		wr.write_error(jsonrpc.ResponseError{
+			code: -32004
+			message: 'Not found'
+			data: p.key
+		})
+		return
+	}
+	
+	wr.write(KvItem{ key: p.key, value: value })
+}
+
+fn (mut h KvHandler) handle_update(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+	p := req.decode_params[KvItem]() or {
+		wr.write_error(jsonrpc.invalid_params)
+		return
+	}
+	
+	if !h.store.update(p.key, p.value) {
+		wr.write_error(jsonrpc.ResponseError{
+			code: -32004
+			message: 'Not found'
+			data: p.key
+		})
+		return
+	}
+	
+	wr.write({ 'ok': true })
+}
+
+fn (mut h KvHandler) handle_delete(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+	p := req.decode_params[KvKey]() or {
+		wr.write_error(jsonrpc.invalid_params)
+		return
+	}
+
+	if !h.store.delete(p.key) {
+		wr.write_error(jsonrpc.ResponseError{
+			code: -32004
+			message: 'Not found'
+			data: p.key
+		})
+		return
+	}
+
+	wr.write({ 'ok': true })
+}
+
+fn (mut h KvHandler) handle_list(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+	mut items := []KvItem{}
+	for k, v in h.store.dump() {
+		items << KvItem{ key: k, value: v }
+	}
+	items.sort(a.key < b.key)
+	wr.write(items)
 }
 
 // ---- Per-connection server loop ----
 // The jsonrpc.Server.start() reads from stream and writes to same stream. :contentReference[oaicite:9]{index=9}
-fn handle_conn(mut conn net.TcpConn) {
+fn handle_conn(mut conn net.TcpConn, h jsonrpc.Handler) {
 	defer { conn.close() or {} }
 
 	mut log_inter := jsonrpc.LoggingInterceptor{}
@@ -143,9 +172,7 @@ fn handle_conn(mut conn net.TcpConn) {
 
 	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
 		stream: conn
-		handler: KvHandler{
-			store: map[string]string{}
-		}
+		handler: h
 		interceptors: inters
 	})
 
@@ -154,6 +181,15 @@ fn handle_conn(mut conn net.TcpConn) {
 }
 
 fn main() {
+	mut s := KvStore{}
+	mut h := KvHandler{store: s}
+	mut r := jsonrpc.Router{}
+	r.register('kv.create', h.handle_create)
+	r.register('kv.get', h.handle_get)
+	r.register('kv.update', h.handle_update)
+	r.register('kv.delete', h.handle_delete)
+	r.register('kv.list', h.handle_list)
+
 	addr := '127.0.0.1:42228'
 	mut l := net.listen_tcp(.ip, addr)!
 	println('TCP JSON-RPC server on ${addr} (Content-Length framing)')
@@ -161,6 +197,6 @@ fn main() {
 	for {
 		mut c := l.accept()!
 		println("Accepted")
-		go handle_conn(mut c)
+		go handle_conn(mut c, r.handle_jsonrpc)
 	}
 }
