@@ -3,6 +3,7 @@ module jsonrpc
 import log
 import sync
 
+@[heap]
 pub struct LoggingInterceptor {
 pub mut:
 	log log.Log

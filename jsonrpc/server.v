@@ -8,11 +8,7 @@ pub struct ServerConfig {
 pub mut:
 	stream    io.ReaderWriter
 	handler      Handler
-	eint []EventInterceptor
-	encreqint []EncodedRequestInterceptor
-	reqint []RequestInterceptor
-	respint []ResponseInterceptor
-	encrespint []EncodedResponseInterceptor
+	interceptors Interceptors
 }
 
 // Server represents a JSONRPC server that sends/receives data
@@ -22,22 +18,14 @@ pub struct Server {
 mut:
 	stream    io.ReaderWriter
 	handler      Handler
-	encreqint []EncodedRequestInterceptor
-	eint []EventInterceptor
-	reqint []RequestInterceptor
-	respint []ResponseInterceptor
-	encrespint []EncodedResponseInterceptor
+	interceptors Interceptors
 }
 
 pub fn new_server(cfg ServerConfig) Server {
 	return Server{
 		stream: cfg.stream
 		handler: cfg.handler
-		eint: cfg.eint
-		encreqint: cfg.encreqint
-		reqint: cfg.reqint
-		respint: cfg.respint
-		encrespint: cfg.encrespint
+		interceptors: cfg.interceptors
 	}
 
 }

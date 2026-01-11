@@ -138,27 +138,23 @@ fn handle_conn(mut conn net.TcpConn) {
 	defer { conn.close() or {} }
 
 	mut log_inter := jsonrpc.LoggingInterceptor{}
-	// inters := jsonrpc.Interceptors{
-	// 	event: [on_event_logger]
-	// 	// encoded_request: [log_inter.on_encoded_request]
-	// 	// request: [log_inter.on_request]
-	// 	// response: [log_inter.on_response]
-	// 	// encoded_response: [log_inter.on_encoded_response]
-	// }
+	mut inters := jsonrpc.Interceptors{
+		event: [log_inter.on_event]
+		encoded_request: [log_inter]
+		request: [log_inter]
+		response: [log_inter]
+		encoded_response: [log_inter]
+	}
 
 	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
 		stream: conn
 		handler: KvHandler{
 			store: map[string]string{}
 		}
-		eint: [log_inter]
-		encreqint: [log_inter]
-		reqint: [log_inter]
-		respint: [log_inter]
-		encrespint: [log_inter]
+		interceptors: inters
 	})
 
-	srv.dispatch_event("start", "server started")
+	jsonrpc.dispatch_event(inters.event, "start", "server started")
 	srv.start()
 }
 
