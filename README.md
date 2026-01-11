@@ -26,7 +26,7 @@ vpkg get jsonrpcv
 ### Request/Response operations
 For both Request/Response constructors are provided and must be used for initialization.
 ```v
-import Te4nick.jsonrpcv as jsonrpc
+import te4nick.jsonrpcv as jsonrpc
 
 // jsonrpc.new_request(method, params, id)
 mut req := jsonrpc.new_request("kv.create", {"key": "key", "value": "value"}, "kv.create.1")
@@ -51,7 +51,7 @@ If the empty string passed as `Result.id` it will use `jsonrpc.null` as id (tran
 For full usage check client in [example](examples/client.v)
 ```v
 import net
-import Te4nick.jsonrpcv as jsonrpc
+import te4nick.jsonrpcv as jsonrpc
 
 addr := '127.0.0.1:42228'
 mut stream := net.dial_tcp(addr)!
@@ -70,7 +70,7 @@ Client can work with any `io.ReaderWriter` provided into stream field value.
 For ready key/value im-memory storage realized with server check this [example](examples/main.v)
 ```v
 import net
-import Te4nick.jsonrpcv as jsonrpc
+import te4nick.jsonrpcv as jsonrpc
 
 fn handle_test(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
 	p := req.decode_params[string]() or {

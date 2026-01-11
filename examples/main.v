@@ -2,7 +2,7 @@ module main
 
 import net
 import sync
-import Te4nick.jsonrpcv as jsonrpc
+import te4nick.jsonrpcv as jsonrpc
 import log
 
 // ---- CRUD domain ----
