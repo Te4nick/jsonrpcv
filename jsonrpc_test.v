@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 import json
 
@@ -40,13 +40,13 @@ fn test_request_obj_params() {
 	method := "params." + id
 	params := {"key": "value"}
 	mut req := new_request(method, params, id)
-	assert req.jsonrpc == jsonrpc.version
+	assert req.jsonrpc == version
 	assert req.method == method
 	assert req.params == json.encode(params)
 	assert req.id == id
 
 	enc_req := req.encode()
-	assert enc_req == '{"jsonrpc":"${jsonrpc.version}","method":"${method}","params":${json.encode(params)},"id":"${id}"}'
+	assert enc_req == '{"jsonrpc":"${version}","method":"${method}","params":${json.encode(params)},"id":"${id}"}'
 
 	assert req.decode_params[map[string]string]()! == params
 
@@ -62,12 +62,12 @@ fn test_request_notification() {
 	method := "req.notif"
 	params := "notif"
 	mut req := new_request(method, params, id)
-	assert req.jsonrpc == jsonrpc.version
+	assert req.jsonrpc == version
 	assert req.method == method
 	assert req.params == '"${params}"'
 	assert req.id == id
 
-	assert req.encode() == '{"jsonrpc":"${jsonrpc.version}","method":"${method}","params":"${params}"}'
+	assert req.encode() == '{"jsonrpc":"${version}","method":"${method}","params":"${params}"}'
 	assert req.decode_params[string]()! == params
 }
 
@@ -76,12 +76,12 @@ fn test_request_empty_params() {
 	method := "req.empty"
 	params := empty
 	mut req := new_request(method, params, id)
-	assert req.jsonrpc == jsonrpc.version
+	assert req.jsonrpc == version
 	assert req.method == method
 	assert req.params == params.str()
 	assert req.id == id
 
-	assert req.encode() == '{"jsonrpc":"${jsonrpc.version}","method":"${method}"}'
+	assert req.encode() == '{"jsonrpc":"${version}","method":"${method}"}'
 	assert req.decode_params[Empty]()! == params
 }
 
@@ -98,7 +98,7 @@ fn test_request_batch() {
 
 	batch := [notif, req]
 	enc_batch := batch.encode_batch()
-	assert enc_batch == '[{"jsonrpc":"${jsonrpc.version}","method":"${n_method}","params":"${n_params}"},{"jsonrpc":"${jsonrpc.version}","method":"${r_method}","params":${json.encode(r_params)},"id":"${r_id}"}]'
+	assert enc_batch == '[{"jsonrpc":"${version}","method":"${n_method}","params":"${n_params}"},{"jsonrpc":"${version}","method":"${r_method}","params":${json.encode(r_params)},"id":"${r_id}"}]'
 
 	assert decode_batch_request(enc_batch)! == batch
 }
@@ -107,13 +107,13 @@ fn test_response_obj_result() {
 	id := "obj"
 	result := {"key": "value"}
 	mut resp := new_response(result, ResponseError{}, id)
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.result == json.encode(result)
 	assert resp.error == ResponseError{}
 	assert resp.id == id
 
 	enc_resp := resp.encode()
-	assert enc_resp == '{"jsonrpc":"${jsonrpc.version}","result":${json.encode(result)},"id":"${id}"}'
+	assert enc_resp == '{"jsonrpc":"${version}","result":${json.encode(result)},"id":"${id}"}'
 
 	assert resp.decode_result[map[string]string]()! == result
 
@@ -129,13 +129,13 @@ fn test_response_error() {
 	result := "should be null"
 	err := parse_error
 	mut resp := new_response(result, err, id)
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.result == ""
 	assert resp.error == parse_error
 	assert resp.id == id
 
 	enc_resp := resp.encode()
-	assert enc_resp == '{"jsonrpc":"${jsonrpc.version}","error":${json.encode(err)},"id":"${id}"}'
+	assert enc_resp == '{"jsonrpc":"${version}","error":${json.encode(err)},"id":"${id}"}'
 
 	assert resp.decode_result[Empty]()! == empty
 
@@ -151,13 +151,13 @@ fn test_response_null_id() {
 	result := "should be null"
 	err := parse_error
 	mut resp := new_response(result, err, id)
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.result == ""
 	assert resp.error == parse_error
 	assert resp.id == id
 
 	enc_resp := resp.encode()
-	assert enc_resp == '{"jsonrpc":"${jsonrpc.version}","error":${json.encode(err)},"id":${null.str()}}'
+	assert enc_resp == '{"jsonrpc":"${version}","error":${json.encode(err)},"id":${null.str()}}'
 
 	assert resp.decode_result[Empty]()! == empty
 
@@ -181,7 +181,7 @@ fn test_response_batch() {
 
 	batch := [r_resp, e_resp]
 	enc_batch := batch.encode_batch()
-	assert enc_batch == '[{"jsonrpc":"${jsonrpc.version}","result":${json.encode(r_result)},"id":"${r_id}"},{"jsonrpc":"${jsonrpc.version}","error":${json.encode(e_err)},"id":${null.str()}}]'
+	assert enc_batch == '[{"jsonrpc":"${version}","result":${json.encode(r_result)},"id":"${r_id}"},{"jsonrpc":"${version}","error":${json.encode(e_err)},"id":${null.str()}}]'
 
 	assert decode_batch_response(enc_batch)! == batch
 }

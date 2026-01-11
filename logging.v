@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 import log
 

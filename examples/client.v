@@ -1,7 +1,7 @@
 module main
 
 import json
-import ../jsonrpc
+import Te4nick.jsonrpcv as jsonrpc
 import net
 
 

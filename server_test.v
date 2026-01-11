@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 import strings
 
@@ -24,9 +24,9 @@ struct KVItem {
 	value string
 }
 
-fn handle_test(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
+fn handle_test(req &Request, mut wr ResponseWriter) {
 	p := req.decode_params[KVItem]() or {
-		wr.write_error(jsonrpc.invalid_params)
+		wr.write_error(invalid_params)
 		return
 	}
 
@@ -35,7 +35,7 @@ fn handle_test(req &jsonrpc.Request, mut wr jsonrpc.ResponseWriter) {
 
 fn test_server_request_response() {
 	mut stream := StringRW{}
-	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
+	mut srv := new_server(ServerConfig{
 		stream: stream 
 		handler: handle_test
 	})
@@ -51,7 +51,7 @@ fn test_server_request_response() {
 	stream.read(mut enc_resp)!
 	resp := decode_response(enc_resp.bytestr())!
 
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.decode_result[KVItem]()! == params
 	assert resp.error == ResponseError{}
 	assert resp.id == id
@@ -62,7 +62,7 @@ fn test_server_router_request_response() {
 	method := "kv.item"
 	r.register(method, handle_test)
 	mut stream := StringRW{}
-	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
+	mut srv := new_server(ServerConfig{
 		stream: stream 
 		handler: r.handle_jsonrpc
 	})
@@ -77,7 +77,7 @@ fn test_server_router_request_response() {
 	stream.read(mut enc_resp)!
 	mut resp := decode_response(enc_resp.bytestr())!
 
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.decode_result[KVItem]()! == params
 	assert resp.error == ResponseError{}
 	assert resp.id == id
@@ -90,8 +90,8 @@ fn test_server_router_request_response() {
 	stream.read(mut enc_resp)!
 	resp = decode_response(enc_resp.bytestr())!
 
-	assert resp.jsonrpc == jsonrpc.version
+	assert resp.jsonrpc == version
 	assert resp.decode_result[Empty]()! == empty
-	assert resp.error == jsonrpc.method_not_found
+	assert resp.error == method_not_found
 	assert resp.id == id
 }

@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 import json
 
@@ -69,7 +69,7 @@ pub const empty = Empty{}
 // Request uses raw JSON strings for id and params in the old VLS code. :contentReference[oaicite:4]{index=4}
 pub struct Request {
 pub:
-	jsonrpc string = jsonrpc.version
+	jsonrpc string = version
 	method  string
 	params  string @[omitempty; raw] // raw JSON object/array/null
 	id      string @[omitempty] // raw JSON (e.g. 1 or "abc") if empty => notification (no id field)
@@ -98,7 +98,7 @@ pub fn (req Request) encode() string {
 		',"params":${req.params}'
 	}
 	id_payload := if req.id.len != 0 { ',"id":"${req.id}"' } else { '' }
-	return '{"jsonrpc":"${jsonrpc.version}","method":"${req.method}"${params_payload}${id_payload}}'
+	return '{"jsonrpc":"${version}","method":"${req.method}"${params_payload}${id_payload}}'
 }
 
 pub fn (reqs []Request) encode_batch() string {
@@ -129,7 +129,7 @@ pub fn decode_batch_request(raw string) ![]Request {
 
 pub struct Response {
 pub:
-	jsonrpc string = jsonrpc.version
+	jsonrpc string = version
 	result  string @[raw]
 	error   ResponseError
 	id      string
@@ -144,7 +144,7 @@ pub fn new_response[T] (result T, error ResponseError, id string) Response {
 }
 
 pub fn (resp Response) encode() string {
-	mut s := '{"jsonrpc":"${jsonrpc.version}"'
+	mut s := '{"jsonrpc":"${version}"'
 	if resp.error.code != 0 {
 		s = s + ',"error":' + json.encode(resp.error)
 	} else {

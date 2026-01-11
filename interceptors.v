@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 // EventInterceptor called on `jsonrpc.dispatch_event`
 pub type EventInterceptor =	fn(name string, data string)

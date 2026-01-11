@@ -1,4 +1,4 @@
-module jsonrpc
+module jsonrpcv
 
 import json
 import strings
@@ -138,7 +138,7 @@ pub fn (r Router) handle_jsonrpc(req &Request, mut wr ResponseWriter) {
 		return
 	}
 
-	wr.write_error(jsonrpc.method_not_found)
+	wr.write_error(method_not_found)
 }
 
 // register `handler` to operate when `method` found in incoming `jsonrpc.Request`
