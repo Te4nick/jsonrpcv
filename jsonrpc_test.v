@@ -3,7 +3,7 @@ module jsonrpc
 import json
 
 
-pub fn test_try_decode_encode() {
+fn test_try_decode_encode() {
 	obj_data := {'key': 'value'}
 	mut enc_data := try_encode[map[string]string](obj_data)
 	assert enc_data == json.encode(obj_data)
@@ -35,7 +35,7 @@ pub fn test_try_decode_encode() {
 	assert try_decode[Empty](enc_data)! == empty_data
 }
 
-pub fn test_request_obj_params() {
+fn test_request_obj_params() {
 	id := "obj"
 	method := "params." + id
 	params := {"key": "value"}
@@ -57,7 +57,7 @@ pub fn test_request_obj_params() {
 	assert req.id == dec_req.id
 }
 
-pub fn test_request_notification() {
+fn test_request_notification() {
 	id := ""
 	method := "req.notif"
 	params := "notif"
@@ -71,7 +71,7 @@ pub fn test_request_notification() {
 	assert req.decode_params[string]()! == params
 }
 
-pub fn test_request_empty_params() {
+fn test_request_empty_params() {
 	id := ""
 	method := "req.empty"
 	params := empty
@@ -85,7 +85,7 @@ pub fn test_request_empty_params() {
 	assert req.decode_params[Empty]()! == params
 }
 
-pub fn test_request_batch() {
+fn test_request_batch() {
 	n_id := ""
 	n_method := "req.notif"
 	n_params := "notif"
@@ -103,7 +103,7 @@ pub fn test_request_batch() {
 	assert decode_batch_request(enc_batch)! == batch
 }
 
-pub fn test_response_obj_result() {
+fn test_response_obj_result() {
 	id := "obj"
 	result := {"key": "value"}
 	mut resp := new_response(result, ResponseError{}, id)
@@ -124,7 +124,7 @@ pub fn test_response_obj_result() {
 	assert resp.id == dec_resp.id
 }
 
-pub fn test_response_error() {
+fn test_response_error() {
 	id := "error"
 	result := "should be null"
 	err := parse_error
@@ -146,7 +146,7 @@ pub fn test_response_error() {
 	assert resp.id == dec_resp.id
 }
 
-pub fn test_response_null_id() {
+fn test_response_null_id() {
 	id := ""
 	result := "should be null"
 	err := parse_error
@@ -168,7 +168,7 @@ pub fn test_response_null_id() {
 	assert resp.id == dec_resp.id
 }
 
-pub fn test_response_batch() {
+fn test_response_batch() {
 	r_id := "obj"
 	r_err := ResponseError{}
 	r_result := {"key": "value"}

@@ -1,7 +1,7 @@
 Module {
-	name: 'rpcrud'
-	description: 'RPC CRUD for vlang models'
-	version: '0.0.0'
+	name: 'jsonrpcv'
+	description: 'JSON-RPC 2.0 implementation in pure V'
+	version: '0.1.0'
 	license: 'MIT'
 	dependencies: []
 }

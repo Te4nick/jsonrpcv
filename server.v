@@ -30,6 +30,13 @@ pub fn new_server(cfg ServerConfig) Server {
 
 }
 
+// respond reads bytes from stream, pass them to the `interceptors.encoded_request`,
+// tries to decode into `jsonrpc.Request` and pass to `interceptors.request`
+// and on fail it responds with `jsonrpc.parse_error` after that it calls handlers
+// (batch requests are handled automatically as well as writing batch response)
+// and passes recieved `jsonrpc.Response` into `interceptors.response` and the
+// last step is to encode `jsonrpc.Response`, pass it into `interceptors.encoded_response`
+// and write to stream
 pub fn (mut s Server) respond() ! {
 	mut rw := s.writer()
 	mut rx := []u8{len: 4096}
@@ -97,6 +104,8 @@ fn (s &Server) writer() &ResponseWriter {
 	}
 }
 
+// start `Server` loop to operate on `stream` passed into constructor
+// it calls `Server.respond()` method in loop
 pub fn (mut s Server) start() {
 	for {
 		s.respond() or {
@@ -107,13 +116,22 @@ pub fn (mut s Server) start() {
 	}
 }
 
+// Handler is the function called when `jsonrpc.Request` is
+// decoded and `jsonrpc.Response` is required which is written
+// into `jsonrpc.ResponseWriter`. Before returning from Handler
+// either `wr.write()` or `wr.write_error()` must be called
+// or the stream will stuck awaiting writing `jsonrpc.Response`
 pub type Handler = fn(req &Request, mut wr ResponseWriter)
 
+// Router is simple map of method names and their `Handler`s
 pub struct Router {
 mut:
 	methods map[string]Handler
 }
 
+// handle_jsonrpc must be passed into `Server` handler field to operate
+// it simply tries to invoke registered methods and if none valid found
+// writes `jsonrpc.method_not_found` error into `jsonrpc.ResponseWriter`
 pub fn (r Router) handle_jsonrpc(req &Request, mut wr ResponseWriter) {
 	if h := r.methods[req.method] {
 		h(req, mut wr)
@@ -123,6 +141,7 @@ pub fn (r Router) handle_jsonrpc(req &Request, mut wr ResponseWriter) {
 	wr.write_error(jsonrpc.method_not_found)
 }
 
+// register `handler` to operate when `method` found in incoming `jsonrpc.Request`
 pub fn (mut r Router) register(method string, handler Handler) bool {
 	if method in r.methods {
 		return false
@@ -160,6 +179,8 @@ fn (mut rw ResponseWriter) close() {
 	rw.sb.go_back_to(0)
 }
 
+// write payload into `jsonrpc.Response.result`.
+// call when need to send data in response
 pub fn (mut rw ResponseWriter) write[T](payload T) {
 	final_resp := Response{
 		id:     rw.req_id
@@ -185,16 +206,8 @@ pub fn (mut rw ResponseWriter) write_empty() {
 	rw.write[Null](null)
 }
 
-pub fn (mut rw ResponseWriter) write_notify[T](method string, params T) {
-	notif := new_notification(method, params)
-	rw.sb.write_string(notif.encode())
-	if rw.is_batch {
-		rw.sb.write_string(', ')
-		return
-	}
-	rw.close()
-}
 
+// write_error into the `jsonrpc.Response` of current request
 pub fn (mut rw ResponseWriter) write_error(err IError) {
 	mut res_err := err
 	if err !is ResponseError {

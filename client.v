@@ -21,6 +21,7 @@ pub fn new_client(cfg ClientConfig) Client {
 	}
 }
 
+// notify sends JSON-RPC 2.0 Notification and returns without waiting for `jsonrpc.Response`
 pub fn (mut c Client) notify[T](method string, params T) ! {
 	mut req := new_request(method, params, "")
 	intercept_request(c.interceptors.request, &req) or {
@@ -35,6 +36,7 @@ pub fn (mut c Client) notify[T](method string, params T) ! {
 	c.stream.write(enc_req) or { return err }
 }
 
+// request new `jsonrpc.Request` and return `jsonrpc.Response`
 pub fn (mut c Client) request[T](method string, params T, id string) !Response {
 	mut req := new_request(method, params, id)
 	intercept_request(c.interceptors.request, &req) or {
@@ -64,6 +66,7 @@ pub fn (mut c Client) request[T](method string, params T, id string) !Response {
 	return resp
 }
 
+// batch sends batch of `jsonrpc.Request` and returns batch of`jsonrpc.Response`
 pub fn (mut c Client) batch(reqs []Request) ![]Response {
 	mut reqs_str := "["
 	for req in reqs {

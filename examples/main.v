@@ -2,7 +2,7 @@ module main
 
 import net
 import sync
-import jsonrpc
+import ../jsonrpc
 import log
 
 // ---- CRUD domain ----
@@ -157,7 +157,7 @@ fn (mut h KvHandler) handle_list(req &jsonrpc.Request, mut wr jsonrpc.ResponseWr
 }
 
 // ---- Per-connection server loop ----
-// The jsonrpc.Server.start() reads from stream and writes to same stream. :contentReference[oaicite:9]{index=9}
+// The jsonrpc.Server.start() reads from stream and writes to same stream.
 fn handle_conn(mut conn net.TcpConn, h jsonrpc.Handler) {
 	defer { conn.close() or {} }
 
