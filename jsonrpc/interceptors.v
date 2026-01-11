@@ -11,26 +11,11 @@ module jsonrpc
 // }
 
 pub type EventInterceptor =	fn(name string, data string)
+pub type EncodedRequestInterceptor = fn(req []u8) !
+pub type RequestInterceptor = fn(req &Request) !
+pub type ResponseInterceptor = fn(resp &Response)
+pub type EncodedResponseInterceptor = fn(resp []u8)
 
-pub interface EncodedRequestInterceptor {
-mut:
-	on_encoded_request(req []u8) !
-}
-
-pub interface RequestInterceptor {
-mut:
-	on_request(req &Request) !
-}
-
-pub interface ResponseInterceptor {
-mut:
-	on_response(resp &Response)
-}
-
-pub interface EncodedResponseInterceptor {
-mut:
-	on_encoded_response(resp []u8)
-}
 
 pub struct Interceptors {
 pub mut:
@@ -47,27 +32,27 @@ pub fn dispatch_event(ints []EventInterceptor, event_name string, data string) {
 	}
 }
 
-pub fn (mut s Server) intercept_encoded_request(req []u8) ! {
-	for mut interceptor in s.interceptors.encoded_request {
-		interceptor.on_encoded_request(req)!
+pub fn intercept_encoded_request(ints []EncodedRequestInterceptor, req []u8) ! {
+	for i in ints {
+		i(req)!
 	}
 }
 
-pub fn (mut s Server) intercept_request(req &Request) ! {
-	for mut interceptor in s.interceptors.request {
-		interceptor.on_request(req)!
+pub fn intercept_request(ints []RequestInterceptor, req &Request) ! {
+	for i in ints {
+		i(req)!
 	}
 }
 
-pub fn (mut s Server) intercept_response(resp &Response) {
-	for mut interceptor in s.interceptors.response {
-		interceptor.on_response(resp)
+pub fn intercept_response(ints []ResponseInterceptor, resp &Response) {
+	for i in ints {
+		i(resp)
 	}
 }
 
-pub fn (mut s Server) intercept_encoded_response(resp []u8) {
-	for mut interceptor in s.interceptors.encoded_response {
-		interceptor.on_encoded_response(resp)
+pub fn intercept_encoded_response(ints []EncodedResponseInterceptor, resp []u8) {
+	for i in ints {
+		i(resp)
 	}
 }
 

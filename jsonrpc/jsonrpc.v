@@ -167,7 +167,14 @@ pub fn new_notification[T] (method string, params T) Notification {
 	}
 }
 
-fn (notif Notification) encode() string {
+pub fn (notif Notification) to_request() Request {
+	return Request{
+		method: notif.method
+		params: notif.params
+	}
+}
+
+pub fn (notif Notification) encode() string {
 	mut s := '{"jsonrpc":"${jsonrpc.version}","method":"${notif.method}","params":'
 	if notif.params.len == 0 {
 		s = s + 'null'

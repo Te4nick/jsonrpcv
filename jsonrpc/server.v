@@ -44,7 +44,7 @@ pub fn (mut s Server) respond() ! {
 		return
 	}
 
-	s.intercept_encoded_request(rx) or {
+	intercept_encoded_request(s.interceptors.encoded_request, rx) or {
 		rw.write_error(response_error(error: err))
 		return err
 	}
@@ -76,7 +76,7 @@ pub fn (mut s Server) respond() ! {
 	for rq in req_batch {
 		rw.req_id = rq.id
 
-		s.intercept_request(&rq) or {
+		intercept_request(s.interceptors.request, &rq) or {
 			rw.write_error(response_error(error: err))
 			return err
 		}
@@ -135,7 +135,7 @@ fn (mut rw ResponseWriter) close_batch() {
 }
 
 fn (mut rw ResponseWriter) close() {
-	rw.server.intercept_encoded_response(rw.sb)
+	intercept_encoded_response(rw.server.interceptors.encoded_response, rw.sb)
 	rw.writer.write(rw.sb) or {}
 	rw.sb.go_back_to(0)
 }
@@ -146,7 +146,7 @@ pub fn (mut rw ResponseWriter) write[T](payload T) {
 		result: json.encode(payload)
 	}
 	
-	rw.server.intercept_response(final_resp)
+	intercept_response(rw.server.interceptors.response, final_resp)
 
 	if rw.req_id.len == 0 {
 		return
@@ -190,7 +190,7 @@ pub fn (mut rw ResponseWriter) write_error(err IError) {
 		error: res_err as ResponseError
 	}
 
-	rw.server.intercept_response(final_resp)
+	intercept_response(rw.server.interceptors.response, final_resp)
 
 	rw.sb.write_string(final_resp.encode())
 	if rw.is_batch {

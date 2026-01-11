@@ -43,6 +43,7 @@ fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.Respons
 				wr.write_error(jsonrpc.invalid_params)
 				return
 			}
+			log.warn("params=${p}")
 			h.mu.@lock()
 			defer { h.mu.unlock() }
 			if p.key in h.store {
@@ -126,12 +127,6 @@ fn (mut h KvHandler) handle_jsonrpc(req &jsonrpc.Request, mut wr jsonrpc.Respons
 	}
 }
 
-pub fn on_event_logger(name string, data string) ! {
-	msg := '[EVENT] name=${name} data=${data}'
-	mut l := log.new_thread_safe_log()
-	l.debug(msg)
-}
-
 // ---- Per-connection server loop ----
 // The jsonrpc.Server.start() reads from stream and writes to same stream. :contentReference[oaicite:9]{index=9}
 fn handle_conn(mut conn net.TcpConn) {
@@ -140,10 +135,10 @@ fn handle_conn(mut conn net.TcpConn) {
 	mut log_inter := jsonrpc.LoggingInterceptor{}
 	mut inters := jsonrpc.Interceptors{
 		event: [log_inter.on_event]
-		encoded_request: [log_inter]
-		request: [log_inter]
-		response: [log_inter]
-		encoded_response: [log_inter]
+		encoded_request: [log_inter.on_encoded_request]
+		request: [log_inter.on_request]
+		response: [log_inter.on_response]
+		encoded_response: [log_inter.on_encoded_response]
 	}
 
 	mut srv := jsonrpc.new_server(jsonrpc.ServerConfig{
