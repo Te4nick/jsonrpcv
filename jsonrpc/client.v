@@ -49,7 +49,7 @@ pub fn (mut c Client) request[T](method string, params T, id string) !Response {
 	c.stream.write(enc_req) or { return err }
 
 	mut enc_resp := []u8{len: 4096}
-	bytes_read := c.stream.read(mut enc_resp) or {
+	c.stream.read(mut enc_resp) or {
 		return err
 	}
 
@@ -64,16 +64,9 @@ pub fn (mut c Client) request[T](method string, params T, id string) !Response {
 	return resp
 }
 
-pub fn (mut c Client) batch(reqs []Request, notifs []Notification) ![]Response {
+pub fn (mut c Client) batch(reqs []Request) ![]Response {
 	mut reqs_str := "["
 	for req in reqs {
-		intercept_request(c.interceptors.request, &req) or {
-			return err
-		}
-		reqs_str = reqs_str + req.encode() + ", "
-	}
-	for notif in notifs {
-		mut req := notif.to_request()
 		intercept_request(c.interceptors.request, &req) or {
 			return err
 		}
@@ -89,7 +82,7 @@ pub fn (mut c Client) batch(reqs []Request, notifs []Notification) ![]Response {
 	c.stream.write(enc_reqs) or { return err }
 
 	mut enc_resp := []u8{len: 4096}
-	bytes_read := c.stream.read(mut enc_resp) or {
+	c.stream.read(mut enc_resp) or {
 		return err
 	}
 
