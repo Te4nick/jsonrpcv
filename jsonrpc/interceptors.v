@@ -10,6 +10,11 @@ module jsonrpc
 // 	on_encoded_response(resp []u8)
 // }
 
+pub interface EventInterceptor {
+mut:
+	on_event(name string, data string)
+
+}
 pub interface EncodedRequestInterceptor {
 mut:
 	on_encoded_request(req []u8) !
@@ -30,11 +35,11 @@ mut:
 	on_encoded_response(resp []u8)
 }
 
-// pub fn (mut s Server) dispatch_event(event_name string, data string) ! {
-// 	for mut i in s.interceptors {
-// 		i.on_event(event_name, data)!
-// 	}
-// }
+pub fn (mut s Server) dispatch_event(event_name string, data string) {
+	for mut i in s.eint {
+		i.on_event(event_name, data)
+	}
+}
 
 pub fn (mut s Server) intercept_encoded_request(req []u8) ! {
 	for mut interceptor in s.encreqint {

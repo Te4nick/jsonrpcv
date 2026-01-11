@@ -8,10 +8,10 @@ pub mut:
 	log log.Log
 }
 
-// pub fn (mut l LoggingInterceptor) on_event(name string, data InterceptorData) ! {
-// 	msg := '[EVENT] name=${name} data=${data}'
-// 	l.log.send_output(msg, l.log.get_level())
-// }
+pub fn (mut l LoggingInterceptor) on_event(name string, data string) {
+	msg := '[EVENT] name=${name} data=${data}'
+	l.log.send_output(msg, l.log.get_level())
+}
 
 pub fn (mut l LoggingInterceptor) on_encoded_request(req []u8) ! {
 	msg := '[RAW REQ] ${req.bytestr()}'

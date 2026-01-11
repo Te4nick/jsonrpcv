@@ -151,13 +151,14 @@ fn handle_conn(mut conn net.TcpConn) {
 		handler: KvHandler{
 			store: map[string]string{}
 		}
-		//interceptors: [log_inter]
+		eint: [log_inter]
 		encreqint: [log_inter]
 		reqint: [log_inter]
 		respint: [log_inter]
 		encrespint: [log_inter]
 	})
 
+	srv.dispatch_event("start", "server started")
 	srv.start()
 }
 

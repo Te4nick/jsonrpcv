@@ -8,6 +8,7 @@ pub struct ServerConfig {
 pub mut:
 	stream    io.ReaderWriter
 	handler      Handler
+	eint []EventInterceptor
 	encreqint []EncodedRequestInterceptor
 	reqint []RequestInterceptor
 	respint []ResponseInterceptor
@@ -22,6 +23,7 @@ mut:
 	stream    io.ReaderWriter
 	handler      Handler
 	encreqint []EncodedRequestInterceptor
+	eint []EventInterceptor
 	reqint []RequestInterceptor
 	respint []ResponseInterceptor
 	encrespint []EncodedResponseInterceptor
@@ -31,6 +33,7 @@ pub fn new_server(cfg ServerConfig) Server {
 	return Server{
 		stream: cfg.stream
 		handler: cfg.handler
+		eint: cfg.eint
 		encreqint: cfg.encreqint
 		reqint: cfg.reqint
 		respint: cfg.respint
