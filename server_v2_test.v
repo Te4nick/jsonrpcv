@@ -23,20 +23,25 @@ struct KVItem {
 	value string
 }
 
-fn handle_test(req &Request, mut wr ResponseWriter) {
-	p := req.decode_params[KVItem]() or {
-		wr.write_error(invalid_params)
-		return
-	}
+struct HandlerV2Test {}
 
-	wr.write(p)
+fn (h HandlerV2Test) handle(req Request) Response {
+	p := req.decode_params[KVItem]() or { return req.err_resp(invalid_params) }
+
+	return req.ok_resp(p)
+}
+
+fn handle_test(req Request) Response {
+	p := req.decode_params[KVItem]() or { return req.err_resp(invalid_params) }
+
+	return req.ok_resp(p)
 }
 
 fn test_server_request_response() {
 	mut stream := StringRW{}
-	mut srv := new_server(ServerConfig{
+	mut srv := new_server_v2(ServerConfigV2{
 		stream:  stream
-		handler: handle_test
+		handler: HandlerV2Test{}
 	})
 
 	id := 'req'
@@ -60,13 +65,13 @@ fn test_server_request_response() {
 }
 
 fn test_server_router_request_response() {
-	mut r := Router{}
+	mut r := RouterV2{}
 	method := 'kv.item'
 	r.register(method, handle_test)
 	mut stream := StringRW{}
-	mut srv := new_server(ServerConfig{
+	mut srv := new_server_v2(ServerConfigV2{
 		stream:  stream
-		handler: r.handle_jsonrpc
+		handler: r
 	})
 
 	id := 'req'
